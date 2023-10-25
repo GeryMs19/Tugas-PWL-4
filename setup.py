@@ -18,6 +18,7 @@ connection = pymysql.connect(
 )
 
 def auth_jwt_verify(request):
+    '''verify jwt token'''
     authorization_header = request.cookies.get('token')
     if authorization_header:
         decoded_user = jwt.decode(authorization_header, 'secret', algorithms=['HS256'])
@@ -50,10 +51,10 @@ def login(request):
         payload = {
             'sub': user['id'],
             'name': user['username'],
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=100)
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=100000)
         }
         encode = jwt.encode(payload, 'secret', algorithm='HS256')
-        set_cookie = request.response.set_cookie('token', encode, max_age=100, httponly=True)
+        set_cookie = request.response.set_cookie('token', encode, max_age=10000, httponly=True)
         with connection.cursor() as cursor:
             sql = "INSERT INTO tokens (user_id, refresh_token, jwt_token) VALUES (%s, %s, %s)"
             cursor.execute(sql, (user['id'], encode, 0))
@@ -70,6 +71,7 @@ def login(request):
 
 @view_config(route_name='logout', renderer='json')
 def logout(request):
+    '''Create a logout view'''
     auth_user = auth_jwt_verify(request)
     if auth_user:
         with connection.cursor() as cursor:
@@ -87,8 +89,9 @@ def logout(request):
         'message': 'Token not found'
     }
 
-@view_config(route_name='hello', renderer="json")
-def hello(request):
+@view_config(route_name='movies', request_method='GET', renderer='json')
+def movie(request):
+    '''Create a hello view to get'''
     auth_user = auth_jwt_verify(request)
     if auth_user:
         # show from table movies
@@ -115,12 +118,61 @@ def hello(request):
         request.response.status = 401  # Unauthorized
         return {'greet': 'Unauthorized', 'name': '', 'error': 'token not found'}
 
+@view_config(route_name='movie-create', request_method='POST', renderer="json")
+def movie_create(request):
+    '''Create a movie view to post'''
+    auth_user = auth_jwt_verify(request)
+    if auth_user:
+        # insert into table movies
+        with connection.cursor() as cursor:
+            sql = "INSERT INTO movies (judul, genre, tahun, director) VALUES (%s, %s, %s, %s)"
+            cursor.execute(sql, (request.POST['judul'], request.POST['genre'], request.POST['tahun'], request.POST['director']))
+            connection.commit()
+        return {'greet': 'ok', 'name': auth_user['name']}
+    else:
+        request.response.status = 401
+        return {'greet': 'Unauthorized', 'name': '', 'error': 'token not found'}
+
+@view_config(route_name='movie-update', request_method='PUT', renderer="json")
+def movie_update(request):
+    '''Create a movie view to put'''
+    auth_user = auth_jwt_verify(request)
+    if auth_user:
+        # update table movies
+        with connection.cursor() as cursor:
+            sql = "UPDATE movies SET judul=%s, genre=%s, tahun=%s, director=%s WHERE id=%s"
+            cursor.execute(sql, (request.POST['judul'], request.POST['genre'], request.POST['tahun'], request.POST['director'], request.POST['id']))
+            connection.commit()
+        return {'greet': 'ok', 'name': auth_user['name']}
+    else:
+        request.response.status = 401
+        return {'greet': 'Unauthorized', 'name': '', 'error': 'token not found'}
+    
+@view_config(route_name='movie-delete', request_method='DELETE', renderer="json")
+def movie_delete(request):
+    '''Create a movie view to delete'''
+    auth_user = auth_jwt_verify(request)
+    if auth_user:
+        # delete from table movies
+        with connection.cursor() as cursor:
+            sql = "DELETE FROM movies WHERE id=%s"
+            cursor.execute(sql, (request.POST['id']))
+            connection.commit()
+        return {'greet': 'ok', 'name': auth_user['name']}
+    else:
+        request.response.status = 401
+        return {'greet': 'Unauthorized', 'name': '', 'error': 'token not found'}
+
+
 if __name__ == "__main__":
     with Configurator() as config:
         config = Configurator(settings={'jwt.secret': 'secret'})
         config.add_route('login', '/login')
         config.add_route('logout', '/logout')
-        config.add_route('hello', '/welcome')
+        config.add_route('movies', '/movie')
+        config.add_route('movie-create', '/movie-create')
+        config.add_route('movie-update', '/movie-update')
+        config.add_route('movie-delete', '/movie-delete')
         config.scan()
         config.set_authorization_policy(ACLAuthorizationPolicy())
         config.add_static_view(name='static', path='static')
