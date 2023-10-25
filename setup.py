@@ -174,10 +174,10 @@ if __name__ == "__main__":
         config.add_route('movie-update', '/movie-update')
         config.add_route('movie-delete', '/movie-delete')
         config.scan()
-        config.set_authorization_policy(ACLAuthorizationPolicy())
+       # config.set_authorization_policy(ACLAuthorizationPolicy())
         config.add_static_view(name='static', path='static')
         config.include('pyramid_jwt')
-        config.set_jwt_authentication_policy(config.get_settings()['jwt.secret'])
+        #config.set_jwt_authentication_policy(config.get_settings()['jwt.secret'])
         
         app = config.make_wsgi_app()
     # Menjalankan aplikasi pada server lokal
